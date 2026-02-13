@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organization Apps Library</title>
+    <style>
+        /* --- Steam-like Design System --- */
+        :root {
+            --bg-color: #171a21;
+            --header-bg: #171a21;
+            --card-bg: #1b2838;
+            --text-color: #c6d4df;
+            --accent-blue: #66c0f4;
+            --accent-green: #a4d007;
+            --fav-color: #ffcc00;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: "Motiva Sans", Sans-serif, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 50px;
+        }
+
+        /* ヘッダー・ログイン周り */
+        header {
+            background-color: var(--header-bg);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            position: sticky; top: 0; z-index: 100;
+            border-bottom: 1px solid #2a475e;
+        }
+        .user-info { display: flex; align-items: center; gap: 15px; font-size: 13px; }
+        .login-btn {
+            background: #2a475e; color: #fff; border: 1px solid #66c0f4;
+            padding: 8px 16px; cursor: pointer; border-radius: 2px;
+        }
+        .login-btn:hover { background: #66c0f4; color: #1b2838; }
+
+        /* コンテンツエリア */
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .header-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px;}
+        .hidden { display: none !important; }
+
+        /* カードデザイン */
+        .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .card {
+            background-color: var(--card-bg); border: 1px solid rgba(0,0,0,0.3); border-radius: 5px;
+            aspect-ratio: 1 / 1; position: relative; overflow: hidden; cursor: pointer; display: flex; flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover { transform: translateY(-4px); border-color: var(--accent-blue); box-shadow: 0 10px 25px rgba(0,0,0,0.7); }
+        
+        /* 編集モード時のスタイル */
+        .card.edit-target { border: 2px dashed var(--accent-blue); cursor: alias; }
+        .card.edit-target:hover::after {
+            content: '編集'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); color: #fff; padding: 5px 15px; border-radius: 4px; pointer-events: none; z-index: 20;
+        }
+
+        .icon-area { height: 50%; background: linear-gradient(135deg, #2a475e 0%, #1b2838 100%); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; border-bottom: 1px solid rgba(0,0,0,0.2); }
+        .app-icon { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; box-shadow: 0 5px 15px rgba(0,0,0,0.3); background-color: #1b2838; }
+        .app-cover-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+        .card:hover .app-cover-image { transform: scale(1.05); }
+        .card-body { padding: 12px 14px 18px 14px; flex: 1; display: flex; flex-direction: column; justify-content: flex-start; }
+        .card-title { color: #fff; font-size: 14px; font-weight: bold; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+        .card-tags { display: flex; align-items: center; gap: 4px; height: 20px; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
+        .tag-chip { font-size: 10px; background: #233c51; color: #66c0f4; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+        .count-tag { background: rgba(255, 255, 255, 0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.1); }
+        .card-desc { font-size: 11px; color: #8b929a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 8px; flex-grow: 1; }
+        .fav-btn { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; z-index: 10; color: #ccc; font-size: 18px; padding-bottom: 2px; transition: all 0.2s; }
+        .fav-btn.active { color: var(--fav-color); text-shadow: 0 0 10px rgba(255, 204, 0, 0.6); }
+
+        /* UIパーツ */
+        .tabs { display: flex; background: rgba(0,0,0,0.2); border-radius: 20px; padding: 3px; }
+        .tab-btn { background: none; border: none; color: #8b929a; padding: 5px 12px; cursor: pointer; border-radius: 16px; font-weight: bold; font-size: 12px; transition: all 0.2s; }
+        .tab-btn.active { background: var(--accent-blue); color: #fff; box-shadow: 0 0 10px rgba(102, 192, 244, 0.3); }
+        .search-box input { background: #101214; border: 1px solid #3c4b5d; padding: 6px 15px; border-radius: 20px; color: #fff; width: 180px; font-size: 12px; }
+        .add-btn { background: linear-gradient(to bottom, #a4d007 5%, #536904 95%); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        
+        .edit-mode-btn { background: #3d4450; color: #fff; border: 1px solid #3c4b5d; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .edit-mode-btn.active { background: var(--accent-blue); color: #1b2838; font-weight: bold; box-shadow: 0 0 10px rgba(102, 192, 244, 0.4); }
+        .edit-hint { background-color: #2a475e; color: #fff; text-align: center; padding: 8px; margin-bottom: 20px; border-radius: 4px; display: none; font-size: 13px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* モーダル関連 */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); padding: 20px;}
+        
+        /* 編集・追加モーダル */
+        .edit-modal-content { background: linear-gradient(to bottom right, #2a475e, #1b2838); padding: 30px; width: 100%; max-width: 500px; border-radius: 4px; border: 1px solid #48647c; max-height: 90vh; overflow-y: auto; }
+        
+        /* 詳細モーダル */
+        .detail-modal-content { background: linear-gradient(to bottom right, #2a475e, #1b2838); width: 100%; max-width: 700px; border-radius: 4px; display: flex; height: 450px; position: relative; border: 1px solid #48647c; overflow: hidden; max-height: 90vh; }
+        @media (max-width: 600px) { .detail-modal-content { flex-direction: column; height: auto; } .detail-left { height: 200px; width: 100%; border-right: none; } }
+        .detail-left { flex: 0 0 40%; background: #000; display: flex; align-items: center; justify-content: center; border-right: 1px solid rgba(0,0,0,0.3); }
+        .detail-img { width: 100%; height: 100%; object-fit: cover; }
+        .detail-right { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--accent-blue); font-size: 13px; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; background: #0e1013; border: 1px solid #3c4b5d; color: #fff; border-radius: 3px; }
+        
+        /* デフォルトタグボタンのスタイル */
+        .default-tag-btn { background: #2a475e; border: 1px solid #48647c; color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 10px; cursor: pointer; margin-right: 5px; margin-bottom: 5px; display: inline-block; }
+        .default-tag-btn:hover { background: #66c0f4; color: #000; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Organization Apps</h1>
+        <div id="authSection" class="user-info">
+            <button id="loginBtn" class="login-btn">Microsoftアカウントでログイン</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="mainControls" class="header-controls hidden" style="justify-content: space-between; margin-bottom: 20px;">
+            <div style="display:flex; gap:10px; align-items:center;">
+                <nav class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('all')">アプリ</button>
+                    <button class="tab-btn" onclick="switchTab('fav')">マイリスト</button>
+                </nav>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="検索 (タイトル/タグ)">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button id="editModeBtn" class="edit-mode-btn">編集</button>
+                <button id="addBtn" class="add-btn">＋</button>
+            </div>
+        </div>
+
+        <div id="editHint" class="edit-hint">編集したいアプリをクリックしてください</div>
+        
+        <div id="loadingMsg" style="text-align:center; padding:50px;">読み込み中...</div>
+        <div id="loginMsg" style="text-align:center; padding:50px; display:none;">
+            アプリを利用するにはログインしてください。
+        </div>
+
+        <div class="app-grid" id="appGrid"></div>
+    </div>
+
+    <div class="modal-overlay" id="detailModal">
+        <div class="detail-modal-content">
+            <button onclick="document.getElementById('detailModal').style.display='none'" style="position:absolute; top:10px; right:15px; background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">×</button>
+            <div class="detail-left"><img id="detailImg" src="" class="detail-img"></div>
+            <div class="detail-right">
+                <h2 id="detailTitle" style="color:var(--accent-blue); margin-bottom:10px;"></h2>
+                <div id="detailTags" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:15px;"></div>
+                <div style="flex:1; margin-bottom:20px; line-height:1.6; font-size:14px;"><p id="detailDesc"></p></div>
+                <a href="#" id="detailLaunchBtn" style="display:block; padding:15px; background:#a4d007; color:#fff; text-align:center; text-decoration:none; font-weight:bold; border-radius:4px; margin-top:auto;" target="_blank">アプリを起動</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="appModal">
+        <div class="edit-modal-content">
+            <h2 id="modalTitle" style="color:#fff; margin-bottom:20px;">アプリを追加</h2>
+            <form id="appForm">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label>タイトル</label>
+                    <input type="text" id="inpTitle" required placeholder="例: 勤怠管理システム">
+                </div>
+                <div class="form-group">
+                    <label>URL</label>
+                    <input type="url" id="inpUrl" required placeholder="https://example.com">
+                </div>
+                <div class="form-group">
+                    <label>画像 (任意)</label>
+                    <div style="font-size:11px; color:#8b929a; margin-bottom:5px;">推奨: 128px以上(正方形) / 800KB以下</div>
+                    <input type="file" id="inpFile" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label>タグ</label>
+                    <div style="margin-bottom:5px;">
+                        <span class="default-tag-btn" onclick="addTagToInput('便利アプリ')">＋便利アプリ</span>
+                        <span class="default-tag-btn" onclick="addTagToInput('ゲーム')">＋ゲーム</span>
+                        <span class="default-tag-btn" onclick="addTagToInput('勉強')">＋勉強</span>
+                        <span class="default-tag-btn" onclick="addTagToInput('広報')">＋広報</span>
+                    </div>
+                    <input type="text" id="inpTags" placeholder="タグ1, タグ2 (カンマ区切り)">
+                </div>
+                <div class="form-group">
+                    <label>説明</label>
+                    <textarea id="inpDesc" rows="3" placeholder="アプリの簡単な説明を入力してください"></textarea>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <button type="button" id="deleteBtn" style="background:transparent; border:1px solid #c23838; color:#c23838; padding:6px 12px; cursor:pointer; font-size:12px; display:none;">削除</button>
+                    <div style="margin-left:auto;">
+                        <button type="button" onclick="document.getElementById('appModal').style.display='none'" style="padding:8px 16px; margin-right:10px; cursor:pointer; background:#3d4450; border:none; color:#fff;">キャンセル</button>
+                        <button type="submit" style="padding:8px 16px; background:var(--accent-blue); border:none; font-weight:bold; cursor:pointer;">保存</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- 1. Firebase設定 (Firebaseコンソールからコピーして貼り付けてください) ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, signOut, onAuthStateChanged, OAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+        apiKey: "AIzaSyA0RLsjFWNVRZbf0niQB4VaSX5P4KoMFxY",
+        authDomain: "app-library-da1f0.firebaseapp.com",
+        projectId: "app-library-da1f0",
+        storageBucket: "app-library-da1f0.firebasestorage.app",
+        messagingSenderId: "876528891898",
+        appId: "1:876528891898:web:40fbe7eead5d1936f71643"
+        };
+
+
+        // Firebase初期化
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- 2. 状態管理 ---
+        let currentUser = null;
+        let appsData = []; // 全アプリ
+        let userFavorites = []; // ユーザーのお気に入りIDリスト
+        let currentTab = 'all';
+        let isEditMode = false;
+        let tempIconBase64 = null;
+
+        // --- 3. 認証処理 ---
+        const provider = new OAuthProvider('microsoft.com');
+        // テナントIDが必要な場合は以下をコメントアウト解除して設定
+        // provider.setCustomParameters({ tenant: 'YOUR_TENANT_ID' });
+        provider.setCustomParameters({
+         // コピーした自分のテナントIDをここに貼り付けます
+         tenant: '5c0d80f1-88ff-4489-93f9-3d2cd0760c16' 
+        });
+
+        const loginBtn = document.getElementById('loginBtn');
+        const authSection = document.getElementById('authSection');
+        
+        loginBtn.addEventListener('click', () => {
+            signInWithPopup(auth, provider).catch((error) => alert("ログイン失敗: " + error.message));
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                authSection.innerHTML = `
+                    <div style="text-align:right;">
+                        <div style="font-weight:bold;">${user.displayName || user.email}</div>
+                        <button id="logoutBtn" style="background:none; border:none; color:#888; cursor:pointer; font-size:11px; text-decoration:underline;">ログアウト</button>
+                    </div>
+                `;
+                document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+                document.getElementById('mainControls').classList.remove('hidden');
+                document.getElementById('loginMsg').style.display = 'none';
+                loadUserData(user.uid);
+                loadAppsData();
+            } else {
+                authSection.innerHTML = '';
+                authSection.appendChild(loginBtn);
+                document.getElementById('mainControls').classList.add('hidden');
+                document.getElementById('appGrid').innerHTML = '';
+                document.getElementById('loadingMsg').style.display = 'none';
+                document.getElementById('loginMsg').style.display = 'block';
+            }
+        });
+
+        // --- 4. Firestore データ処理 ---
+        function loadUserData(uid) {
+            const userDocRef = doc(db, "users", uid);
+            onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    userFavorites = docSnap.data().favorites || [];
+                } else {
+                    userFavorites = [];
+                    setDoc(userDocRef, { favorites: [] });
+                }
+                renderApps();
+            });
+        }
+
+        function loadAppsData() {
+            const q = collection(db, "apps");
+            onSnapshot(q, (snapshot) => {
+                appsData = [];
+                snapshot.forEach((doc) => {
+                    appsData.push({ id: doc.id, ...doc.data() });
+                });
+                appsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                document.getElementById('loadingMsg').style.display = 'none';
+                renderApps();
+            });
+        }
+
+        // --- 5. UI制御 & モーダル ---
+        
+        // 編集モード切替
+        document.getElementById('editModeBtn').addEventListener('click', () => {
+            isEditMode = !isEditMode;
+            document.getElementById('editModeBtn').classList.toggle('active');
+            document.getElementById('editHint').style.display = isEditMode ? 'block' : 'none';
+            renderApps();
+        });
+
+        // モーダルオープン関数 (追加・編集兼用)
+        window.openAppModal = (mode, appId = null) => {
+            const modal = document.getElementById('appModal');
+            const form = document.getElementById('appForm');
+            const titleEl = document.getElementById('modalTitle');
+            const deleteBtn = document.getElementById('deleteBtn');
+            
+            form.reset();
+            tempIconBase64 = null; // 画像リセット
+
+            if (mode === 'add') {
+                titleEl.innerText = "アプリを追加";
+                document.getElementById('editId').value = "";
+                deleteBtn.style.display = "none";
+            } else {
+                titleEl.innerText = "アプリを編集";
+                const app = appsData.find(a => a.id === appId);
+                if(app) {
+                    document.getElementById('editId').value = app.id;
+                    document.getElementById('inpTitle').value = app.title;
+                    document.getElementById('inpUrl').value = app.url;
+                    document.getElementById('inpDesc').value = app.desc;
+                    document.getElementById('inpTags').value = (app.tags || []).join(', ');
+                    tempIconBase64 = app.iconUrl; // 既存画像を保持
+                    
+                    deleteBtn.style.display = "block";
+                    deleteBtn.onclick = () => deleteApp(app.id);
+                }
+            }
+            modal.style.display = 'flex';
+        };
+
+        // 追加ボタン
+        document.getElementById('addBtn').addEventListener('click', () => {
+            window.openAppModal('add');
+        });
+
+        // デフォルトタグ追加
+        window.addTagToInput = (tag) => {
+            const input = document.getElementById('inpTags');
+            const current = input.value.trim();
+            input.value = current ? current + ', ' + tag : tag;
+        };
+
+        // 画像処理
+        document.getElementById('inpFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            if(file.size > 800 * 1024) { alert('画像は800KB以下にしてください'); e.target.value = ''; return; }
+            const reader = new FileReader();
+            reader.onload = (ev) => tempIconBase64 = ev.target.result;
+            reader.readAsDataURL(file);
+        });
+
+        // 保存処理 (追加/更新)
+        document.getElementById('appForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if(!currentUser) return;
+
+            const editId = document.getElementById('editId').value;
+            const title = document.getElementById('inpTitle').value;
+            const url = document.getElementById('inpUrl').value;
+            const desc = document.getElementById('inpDesc').value;
+            const tags = document.getElementById('inpTags').value.split(',').map(t=>t.trim()).filter(t=>t);
+            const iconUrl = tempIconBase64 || `https://ui-avatars.com/api/?name=${encodeURIComponent(title)}&background=random&color=fff&size=128`;
+
+            try {
+                if (editId) {
+                    // 更新
+                    const appRef = doc(db, "apps", editId);
+                    await updateDoc(appRef, { title, url, desc, tags, iconUrl });
+                } else {
+                    // 新規追加
+                    await addDoc(collection(db, "apps"), {
+                        title, url, desc, tags, iconUrl,
+                        createdBy: currentUser.uid,
+                        createdAt: Date.now()
+                    });
+                }
+                document.getElementById('appModal').style.display = 'none';
+            } catch (err) {
+                console.error("Error:", err);
+                alert("保存に失敗しました");
+            }
+        });
+
+        // 削除処理
+        async function deleteApp(appId) {
+            if(confirm('本当にこのアプリを削除しますか？')) {
+                try {
+                    await deleteDoc(doc(db, "apps", appId));
+                    document.getElementById('appModal').style.display = 'none';
+                } catch(err) {
+                    alert("削除に失敗しました");
+                }
+            }
+        }
+
+        // --- 6. その他機能 ---
+        document.getElementById('searchInput').addEventListener('input', renderApps);
+        
+        window.switchTab = (t) => {
+            currentTab = t;
+            document.querySelectorAll('.tab-btn').forEach((b, i) => {
+                b.classList.toggle('active', (i === 0 && t === 'all') || (i === 1 && t === 'fav'));
+            });
+            renderApps();
+        };
+
+        window.toggleFav = async (appId) => {
+            if (!currentUser) return;
+            const userRef = doc(db, "users", currentUser.uid);
+            const isFav = userFavorites.includes(appId);
+            if (isFav) { await updateDoc(userRef, { favorites: arrayRemove(appId) }); } 
+            else { await updateDoc(userRef, { favorites: arrayUnion(appId) }); }
+        };
+
+        window.openDetail = (appId) => {
+            const app = appsData.find(a => a.id === appId);
+            if(!app) return;
+            document.getElementById('detailTitle').innerText = app.title;
+            document.getElementById('detailDesc').innerText = app.desc || "説明はありません";
+            document.getElementById('detailImg').src = app.iconUrl;
+            document.getElementById('detailLaunchBtn').href = app.url;
+            
+            const tagsDiv = document.getElementById('detailTags');
+            tagsDiv.innerHTML = '';
+            app.tags?.forEach(t => {
+                const sp = document.createElement('span');
+                sp.innerText = t;
+                sp.style.cssText = "background:rgba(102,192,244,0.15); color:#66c0f4; padding:4px 10px; border-radius:4px; font-size:12px; border:1px solid rgba(102,192,244,0.3);";
+                tagsDiv.appendChild(sp);
+            });
+            document.getElementById('detailModal').style.display = 'flex';
+        };
+
+        // --- 7. 描画 ---
+        function renderApps() {
+            const grid = document.getElementById('appGrid');
+            grid.innerHTML = '';
+
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            const filtered = appsData.filter(app => {
+                const isFav = userFavorites.includes(app.id);
+                if (currentTab === 'fav' && !isFav) return false;
+                if (query) {
+                    const inTitle = app.title.toLowerCase().includes(query);
+                    const inTag = app.tags?.some(t => t.toLowerCase().includes(query));
+                    return inTitle || inTag;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#888;">アプリがありません</div>';
+                return;
+            }
+
+            filtered.forEach(app => {
+                const isFav = userFavorites.includes(app.id);
+                const isAuto = app.iconUrl.includes('ui-avatars.com');
+                
+                let tagHtml = '';
+                const tags = app.tags || [];
+                if(tags.length > 0) {
+                    tagHtml = tags.slice(0, 2).map(t => `<span class="tag-chip">${t}</span>`).join('');
+                    if(tags.length > 2) tagHtml += `<span class="tag-chip count-tag">+${tags.length - 2}</span>`;
+                }
+
+                const div = document.createElement('div');
+                div.className = 'card' + (isEditMode ? ' edit-target' : '');
+                
+                // クリック時の挙動分岐
+                div.onclick = () => {
+                    if(isEditMode) window.openAppModal('edit', app.id);
+                    else window.openDetail(app.id);
+                };
+
+                div.innerHTML = `
+                    <button class="fav-btn ${isFav ? 'active' : ''}" onclick="event.stopPropagation(); toggleFav('${app.id}')">★</button>
+                    <div class="icon-area">
+                        <img src="${app.iconUrl}" class="${isAuto ? 'app-icon' : 'app-cover-image'}">
+                    </div>
+                    <div class="card-body">
+                        <div class="card-title">${app.title}</div>
+                        <div class="card-tags">${tagHtml}</div>
+                        <div class="card-desc">${app.desc || ''}</div>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
